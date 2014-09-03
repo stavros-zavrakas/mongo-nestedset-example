@@ -36,17 +36,20 @@ var prompt = require('prompt'),
       prompt.start();
       prompt.get(schema, function (err, result) {
         if(result.populate == "Y") {
+          console.log("-------------------------------------------------");
+          console.log("Populating.. Please wait..");
+
           var i;
           var localSubPages;
           var menuPages = new User({pageName: 'menu'});
 
-          var pages = buildSubPageLayer("First", menuPages, SUB_PAGES_SIZE);
+          var pages = buildSubPageLayer("", menuPages, SUB_PAGES_SIZE);
           for (i = 0; i < SUB_PAGES_SIZE ; i++ ) {
-            localSubPages = buildSubPageLayer("Second", pages[i], SUB_PAGES_SIZE);
+            localSubPages = buildSubPageLayer(i+"_", pages[i], SUB_PAGES_SIZE);
             pages = pages.concat(localSubPages);
 
             for (j = 0; j < SUB_PAGES_SIZE ; j++ ) {
-              localSubPages = buildSubPageLayer("Third", localSubPages[j], SUB_PAGES_SIZE);
+              localSubPages = buildSubPageLayer(i + "_" + j + "_", localSubPages[j], SUB_PAGES_SIZE);
               pages = pages.concat(localSubPages);
             }
           }
@@ -55,7 +58,6 @@ var prompt = require('prompt'),
           async.each(
             pages
             , function(item, cb) { 
-            // console.log(item.pageName);
             item.save(cb); 
           },function(err){
             callback();
@@ -67,15 +69,17 @@ var prompt = require('prompt'),
     },
     function(callback) {
       console.log("-------------------------------------------------");
-      console.log("Is sub_page_First_1 ancestor of sub_page_Third_0?");
-      var t1 = process.hrtime();
-      User.findOne({pageName: 'sub_page_First_1'}, function(err, sub_page_First_0) {
-        User.rebuildTree(sub_page_First_0, 1, function() {
-          User.findOne({pageName: 'sub_page_Third_0'}, function(err, sub_page_Second_0) {
-            var t2 = process.hrtime();
-            console.log(sub_page_First_0.isAncestorOf(sub_page_Second_0));
-            console.log("Time needed: " + hrdiff(t1, t2) + " second(s)");
-            callback();
+      console.log("Search for ancestors?");
+      prompt.get(['ancestor', 'child'], function (err, result) {
+        var t1 = process.hrtime();
+        User.findOne({pageName: result.ancestor}, function(err, ancestor) {
+          User.rebuildTree(ancestor, 1, function() {
+            User.findOne({pageName: result.child}, function(err, child) {
+              var t2 = process.hrtime();
+              console.log(ancestor.isAncestorOf(child));
+              console.log("Time needed: " + hrdiff(t1, t2) + " second(s)");
+              callback();
+            });
           });
         });
       });
@@ -83,15 +87,17 @@ var prompt = require('prompt'),
     function(callback) {
       console.log("-------------------------------------------------");
       console.log("selfAndAncestors should return all ancestors higher up in tree + current node");
-      var t1 = process.hrtime();
-      User.findOne({pageName: 'sub_page_First_1'}, function(err, sub_page_First_1) {
-        User.rebuildTree(sub_page_First_1, 1, function() {
-          User.findOne({pageName: 'sub_page_Second_1'}, function(err, sub_page_Second_1) {
-            sub_page_Second_1.selfAndAncestors(function(err, people) {
-              var t2 = process.hrtime();
-              console.log(people);
-              console.log("Time needed: " + hrdiff(t1, t2) + " second(s)");
-              callback();
+      prompt.get(['ancestor', 'child'], function (err, result) {
+        var t1 = process.hrtime();
+        User.findOne({pageName: result.ancestor}, function(err, ancestor) {
+          User.rebuildTree(ancestor, 1, function() {
+            User.findOne({pageName: result.child}, function(err, child) {
+              child.selfAndAncestors(function(err, people) {
+                var t2 = process.hrtime();
+                console.log(people);
+                console.log("Time needed: " + hrdiff(t1, t2) + " second(s)");
+                callback();
+              });
             });
           });
         });
@@ -108,7 +114,7 @@ function buildSubPageLayer(subPageDepthName, parentPage, parentLayerSize) {
   var i;
   var subPages = Array();
   for (i = 0; i < parentLayerSize; i++) {
-    subPages.push(new User({pageName: 'sub_page_'+subPageDepthName+'_'+i, parentId: parentPage._id}));
+    subPages.push(new User({pageName: 'sub_page_' + subPageDepthName + i, parentId: parentPage._id}));
   }
   return subPages;
 }
