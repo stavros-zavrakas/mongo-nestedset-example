@@ -36,31 +36,35 @@ var prompt = require('prompt'),
       prompt.start();
       prompt.get(schema, function (err, result) {
         if(result.populate == "Y") {
-          console.log("-------------------------------------------------");
-          console.log("Populating.. Please wait..");
+          prompt.get({ description: "Enter the number of pages", type: "string", default: SUB_PAGES_SIZE, required: true}, function(err, result) {
+            SUB_PAGES_SIZE = result.question;
+            
+            console.log("-------------------------------------------------");
+            console.log("Populating.. Please wait..");
+            
+            var i;
+            var localSubPages;
+            var menuPages = new User({pageName: 'menu'});
 
-          var i;
-          var localSubPages;
-          var menuPages = new User({pageName: 'menu'});
-
-          var pages = buildSubPageLayer("", menuPages, SUB_PAGES_SIZE);
-          for (i = 0; i < SUB_PAGES_SIZE ; i++ ) {
-            localSubPages = buildSubPageLayer(i+"_", pages[i], SUB_PAGES_SIZE);
-            pages = pages.concat(localSubPages);
-
-            for (j = 0; j < SUB_PAGES_SIZE ; j++ ) {
-              localSubPages = buildSubPageLayer(i + "_" + j + "_", localSubPages[j], SUB_PAGES_SIZE);
+            var pages = buildSubPageLayer("", menuPages, SUB_PAGES_SIZE);
+            for (i = 0; i < SUB_PAGES_SIZE ; i++ ) {
+              localSubPages = buildSubPageLayer(i+"_", pages[i], SUB_PAGES_SIZE);
               pages = pages.concat(localSubPages);
+
+              for (j = 0; j < SUB_PAGES_SIZE ; j++ ) {
+                localSubPages = buildSubPageLayer(i + "_" + j + "_", localSubPages[j], SUB_PAGES_SIZE);
+                pages = pages.concat(localSubPages);
+              }
             }
-          }
-          pages.push(menuPages);
-          
-          async.each(
-            pages
-            , function(item, cb) { 
-            item.save(cb); 
-          },function(err){
-            callback();
+            pages.push(menuPages);
+            
+            async.each(
+              pages
+              , function(item, cb) { 
+              item.save(cb); 
+            },function(err){
+              callback();
+            });
           });
         } else {
           callback();
@@ -69,7 +73,7 @@ var prompt = require('prompt'),
     },
     function(callback) {
       console.log("-------------------------------------------------");
-      console.log("Search for ancestors?");
+      console.log("Is ancestor?");
       prompt.get(['ancestor', 'child'], function (err, result) {
         var t1 = process.hrtime();
         User.findOne({pageName: result.ancestor}, function(err, ancestor) {
@@ -84,19 +88,61 @@ var prompt = require('prompt'),
         });
       });
     },
+    // function(callback) {
+    //   console.log("-------------------------------------------------");
+    //   console.log("selfAndAncestors should return all ancestors higher up in tree + current node");
+    //   prompt.get(['ancestor', 'child'], function (err, result) {
+    //     var t1 = process.hrtime();
+    //     User.findOne({pageName: result.ancestor}, function(err, ancestor) {
+    //       User.rebuildTree(ancestor, 1, function() {
+    //         User.findOne({pageName: result.child}, function(err, child) {
+    //           child.selfAndAncestors(function(err, people) {
+    //             var t2 = process.hrtime();
+    //             console.log(people);
+    //             console.log("Time needed: " + hrdiff(t1, t2) + " second(s)");
+    //             callback();
+    //           });
+    //         });
+    //       });
+    //     });
+    //   });
+    // },
     function(callback) {
       console.log("-------------------------------------------------");
-      console.log("selfAndAncestors should return all ancestors higher up in tree + current node");
-      prompt.get(['ancestor', 'child'], function (err, result) {
+      console.log("Remove a node and re-arrange the tree");
+      prompt.get(['node'], function (err, result) {
         var t1 = process.hrtime();
-        User.findOne({pageName: result.ancestor}, function(err, ancestor) {
-          User.rebuildTree(ancestor, 1, function() {
-            User.findOne({pageName: result.child}, function(err, child) {
-              child.selfAndAncestors(function(err, people) {
+        User.findOne({pageName: 'menu'}, function(err, menu) {
+          User.rebuildTree(menu, 1, function() {
+            User.findOne({pageName: result.node}, function(err, pageToRemove) {
+              pageToRemove.remove(function() {
                 var t2 = process.hrtime();
-                console.log(people);
                 console.log("Time needed: " + hrdiff(t1, t2) + " second(s)");
                 callback();
+              });
+            });
+          });
+        });
+      });
+    },
+    function(callback) {
+      console.log("-------------------------------------------------");
+      console.log("Add a node and re-arrange the tree");
+      prompt.get(['node'], function (err, result) {
+        var t1 = process.hrtime();
+        User.findOne({pageName: 'menu'}, function(err, menu) {
+          User.rebuildTree(menu, 1, function() {
+            User.findOne({pageName: 'sub_page_0'}, function(err, pageParent) {
+              var newUser = new User({
+                pageName: 'sub_page_0_0',
+                parentId: pageParent._id
+              });
+              newUser.save(function(err, joe) {
+                User.find(function(err, users) {
+                  var t2 = process.hrtime();
+                  console.log("Time needed: " + hrdiff(t1, t2) + " second(s)");
+                  callback();
+                });
               });
             });
           });
